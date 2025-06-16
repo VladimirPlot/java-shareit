@@ -1,55 +1,44 @@
-package ru.practicum.shareit.item;
+package ru.practicum.shareit.item.service;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exception.ItemNotFoundException;
 import ru.practicum.shareit.exception.OwnerNotFoundException;
-import ru.practicum.shareit.exception.BadRequestException;
 import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.mapper.ItemMapper;
 import ru.practicum.shareit.item.model.Item;
-import ru.practicum.shareit.user.User;
-import ru.practicum.shareit.user.UserMapper;
-import ru.practicum.shareit.user.UserService;
+import ru.practicum.shareit.user.model.User;
+import ru.practicum.shareit.user.mapper.UserMapper;
+import ru.practicum.shareit.user.service.UserService;
 import ru.practicum.shareit.user.dto.UserDto;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ItemServiceImpl implements ItemService {
-    private final List<Item> items = new ArrayList<>();
+    private final Map<Long, Item> items = new HashMap<>();
     private final UserService userService;
     private long nextId = 1;
 
-    public ItemServiceImpl(UserService userService) {
-        this.userService = userService;
-    }
-
     @Override
-    public ItemDto createItem(ItemDto itemDto, long ownerId) {
-        if (itemDto == null) {
-            throw new BadRequestException("Item data is required");
-        }
-
+    public ItemDto createItem(ItemDto itemDto, Long ownerId) {
         UserDto userDto = userService.getUserById(ownerId);
         User owner = UserMapper.toUser(userDto);
 
         Item createdItem = ItemMapper.toItem(itemDto, owner);
         createdItem.setId(nextId++);
-        items.add(createdItem);
+        items.put(createdItem.getId(), createdItem);
 
         return ItemMapper.toItemDto(createdItem);
     }
 
     @Override
-    public ItemDto updateItem(ItemDto itemDto, long itemId, long ownerId) {
-        if (itemDto == null) {
-            throw new BadRequestException("Item data is required");
-        }
-
+    public ItemDto updateItem(ItemDto itemDto, Long itemId, Long ownerId) {
         Item existingItem = findItemById(itemId);
 
-        if (existingItem.getOwner().getId() != ownerId) {
+        if (!Objects.equals(existingItem.getOwner().getId(), ownerId)) {
             throw new OwnerNotFoundException("Only the owner can update the item");
         }
 
@@ -68,14 +57,14 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public ItemDto getItemById(long itemId, long userId) {
+    public ItemDto getItemById(Long itemId, Long userId) {
         return ItemMapper.toItemDto(findItemById(itemId));
     }
 
     @Override
-    public List<ItemDto> getAllItemsByOwner(long ownerId) {
-        return items.stream()
-                .filter(item -> item.getOwner().getId() == ownerId)
+    public List<ItemDto> getAllItemsByOwner(Long ownerId) {
+        return items.values().stream()
+                .filter(item -> Objects.equals(item.getOwner().getId(), ownerId))
                 .map(ItemMapper::toItemDto)
                 .collect(Collectors.toList());
     }
@@ -86,7 +75,7 @@ public class ItemServiceImpl implements ItemService {
 
         String lowerText = text.toLowerCase();
 
-        return items.stream()
+        return items.values().stream()
                 .filter(item -> Boolean.TRUE.equals(item.getAvailable()) &&
                         (item.getName().toLowerCase().contains(lowerText) ||
                                 item.getDescription().toLowerCase().contains(lowerText)))
@@ -94,10 +83,11 @@ public class ItemServiceImpl implements ItemService {
                 .collect(Collectors.toList());
     }
 
-    private Item findItemById(long itemId) {
-        return items.stream()
-                .filter(item -> item.getId() == itemId)
-                .findFirst()
-                .orElseThrow(() -> new ItemNotFoundException("Item not found with id: " + itemId));
+    private Item findItemById(Long itemId) {
+        Item item = items.get(itemId);
+        if (item == null) {
+            throw new ItemNotFoundException("Item not found with id: " + itemId);
+        }
+        return item;
     }
 }
