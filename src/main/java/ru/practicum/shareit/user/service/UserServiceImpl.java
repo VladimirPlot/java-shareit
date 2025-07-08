@@ -1,79 +1,87 @@
 package ru.practicum.shareit.user.service;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 import ru.practicum.shareit.exception.EmailAlreadyExistsException;
 import ru.practicum.shareit.exception.UserNotFoundException;
 import ru.practicum.shareit.user.dto.UserDto;
 import ru.practicum.shareit.user.mapper.UserMapper;
 import ru.practicum.shareit.user.model.User;
+import ru.practicum.shareit.user.repository.UserRepository;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
-
-    private final Map<Long, User> users = new HashMap<>();
-    private long nextId = 1;
+    private final UserRepository userRepository;
 
     @Override
+    @Transactional
     public UserDto createUser(UserDto userDto) {
         validateEmailUnique(userDto.getEmail(), null);
 
         User user = UserMapper.toUser(userDto);
-        user.setId(nextId++);
-        users.put(user.getId(), user);
-        return UserMapper.toUserDto(user);
+        User saved = userRepository.save(user);
+        return UserMapper.toUserDto(saved);
     }
 
     @Override
+    @Transactional
     public UserDto updateUser(UserDto userDto) {
-        User existingUser = findUserById(userDto.getId());
+        User existing = userRepository.findById(userDto.getId())
+                .orElseThrow(() -> new UserNotFoundException(
+                        "User not found with id: " + userDto.getId()));
 
         if (userDto.getName() != null) {
-            existingUser.setName(userDto.getName());
+            existing.setName(userDto.getName());
         }
         if (userDto.getEmail() != null) {
-            validateEmailUnique(userDto.getEmail(), existingUser.getId());
-            existingUser.setEmail(userDto.getEmail());
+            validateEmailUnique(userDto.getEmail(), existing.getId());
+            existing.setEmail(userDto.getEmail());
         }
-        return UserMapper.toUserDto(existingUser);
+
+        User updated = userRepository.save(existing);
+        return UserMapper.toUserDto(updated);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() {
-        return users.values().stream()
+        return userRepository.findAll().stream()
                 .map(UserMapper::toUserDto)
                 .collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDto getUserById(Long userId) {
-        return UserMapper.toUserDto(findUserById(userId));
-    }
-
-    @Override
-    public UserDto removeUserById(Long userId) {
-        User user = findUserById(userId);
-        users.remove(user.getId());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(
+                        "User not found with id: " + userId));
         return UserMapper.toUserDto(user);
     }
 
-    private User findUserById(Long userId) {
-        User user = users.get(userId);
-        if (user == null) {
-            throw new UserNotFoundException("User not found with id: " + userId);
-        }
-        return user;
+    @Override
+    @Transactional
+    public UserDto removeUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(
+                        "User not found with id: " + userId));
+        userRepository.delete(user);
+        return UserMapper.toUserDto(user);
     }
 
     private void validateEmailUnique(String email, Long excludeId) {
-        users.values().stream()
-                .filter(user -> user.getEmail().equalsIgnoreCase(email))
-                .filter(user -> excludeId == null || !Objects.equals(user.getId(), excludeId))
+        userRepository.findAll().stream()
+                .filter(u -> u.getEmail().equalsIgnoreCase(email))
+                .filter(u -> !Objects.equals(u.getId(), excludeId))
                 .findAny()
-                .ifPresent(user -> {
-                    throw new EmailAlreadyExistsException("Email already in use");
+                .ifPresent(u -> {
+                    throw new EmailAlreadyExistsException(
+                            "Email already in use");
                 });
     }
 }
