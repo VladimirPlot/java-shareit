@@ -38,16 +38,14 @@ class BookingResponseDtoJsonTest {
 
     @Test
     void testDeserialize() throws Exception {
-        String json = """
-                {
-                  "id": 42,
-                  "start": "2025-07-13T12:00:00",
-                  "end": "2025-07-14T12:00:00",
-                  "status": "APPROVED",
-                  "booker": { "id": 1, "name": "User", "email": "user@example.com" },
-                  "item": { "id": 2, "name": "Item", "description": "Desc", "available": true }
-                }
-                """;
+        String json = "{"
+                + "\"id\": 42,"
+                + "\"start\": \"2025-07-13T12:00:00\","
+                + "\"end\": \"2025-07-14T12:00:00\","
+                + "\"status\": \"APPROVED\","
+                + "\"booker\": { \"id\": 1, \"name\": \"User\", \"email\": \"user@example.com\" },"
+                + "\"item\": { \"id\": 2, \"name\": \"Item\", \"description\": \"Desc\", \"available\": true }"
+                + "}";
 
         BookingResponseDto dto = objectMapper.readValue(json, BookingResponseDto.class);
 

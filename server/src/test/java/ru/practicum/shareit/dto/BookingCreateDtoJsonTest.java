@@ -39,13 +39,11 @@ class BookingCreateDtoJsonTest {
 
     @Test
     void testDeserialize() throws Exception {
-        String jsonStr = """
-                    {
-                        "itemId": 2,
-                        "start": "2025-07-20T10:30:00",
-                        "end": "2025-07-21T10:30:00"
-                    }
-                """;
+        String jsonStr = "{"
+                + "\"itemId\": 2,"
+                + "\"start\": \"2025-07-20T10:30:00\","
+                + "\"end\": \"2025-07-21T10:30:00\""
+                + "}";
 
         BookingCreateDto dto = json.parseObject(jsonStr);
 

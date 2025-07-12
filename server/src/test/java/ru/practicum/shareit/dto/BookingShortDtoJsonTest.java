@@ -33,14 +33,12 @@ class BookingShortDtoJsonTest {
 
     @Test
     void testDeserialize() throws Exception {
-        String json = """
-                {
-                  "id": 99,
-                  "bookerId": 12,
-                  "start": "2025-07-11T09:00:00",
-                  "end": "2025-07-11T15:00:00"
-                }
-                """;
+        String json = "{"
+                + "\"id\": 99,"
+                + "\"bookerId\": 12,"
+                + "\"start\": \"2025-07-11T09:00:00\","
+                + "\"end\": \"2025-07-11T15:00:00\""
+                + "}";
 
         BookingShortDto dto = objectMapper.readValue(json, BookingShortDto.class);
 
