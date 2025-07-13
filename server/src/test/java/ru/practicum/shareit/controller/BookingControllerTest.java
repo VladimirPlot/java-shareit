@@ -13,6 +13,10 @@ import ru.practicum.shareit.booking.dto.BookingCreateDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.model.StatusBooking;
 import ru.practicum.shareit.booking.service.BookingService;
+import ru.practicum.shareit.exception.BadRequestException;
+import ru.practicum.shareit.exception.BookingNotFoundException;
+import ru.practicum.shareit.exception.OwnerNotFoundException;
+import ru.practicum.shareit.exception.UserNotFoundException;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.user.dto.UserDto;
 
@@ -110,5 +114,51 @@ class BookingControllerTest {
                         .param("state", "ALL"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(1));
+    }
+
+    @Test
+    void createBooking_userNotFound_shouldReturn404() throws Exception {
+        BookingCreateDto createDto = new BookingCreateDto(1L, bookingResponse.getStart(), bookingResponse.getEnd());
+
+        Mockito.when(bookingService.createBooking(anyLong(), any()))
+                .thenThrow(new UserNotFoundException("User not found"));
+
+        mvc.perform(post("/bookings")
+                        .header("X-Sharer-User-Id", 99L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(createDto)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void approveBooking_ownerNotFound_shouldReturn403() throws Exception {
+        Mockito.when(bookingService.approveBooking(anyLong(), anyLong(), anyBoolean()))
+                .thenThrow(new OwnerNotFoundException("Access denied"));
+
+        mvc.perform(patch("/bookings/1")
+                        .header("X-Sharer-User-Id", 99L)
+                        .param("approved", "true"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void approveBooking_alreadyApproved_shouldReturn400() throws Exception {
+        Mockito.when(bookingService.approveBooking(anyLong(), anyLong(), anyBoolean()))
+                .thenThrow(new BadRequestException("Already approved"));
+
+        mvc.perform(patch("/bookings/1")
+                        .header("X-Sharer-User-Id", 1L)
+                        .param("approved", "true"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getBookingById_notFound_shouldReturn404() throws Exception {
+        Mockito.when(bookingService.getBookingById(anyLong(), anyLong()))
+                .thenThrow(new BookingNotFoundException("Booking not found"));
+
+        mvc.perform(get("/bookings/99")
+                        .header("X-Sharer-User-Id", 1L))
+                .andExpect(status().isNotFound());
     }
 }

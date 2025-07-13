@@ -9,7 +9,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.practicum.shareit.exception.BadRequestException;
+import ru.practicum.shareit.exception.ItemNotFoundException;
 import ru.practicum.shareit.item.controller.ItemController;
+import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.service.ItemService;
 
@@ -97,5 +100,44 @@ class ItemControllerTest {
                         .header("X-Sharer-User-Id", 1L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].description").value("Ударная дрель"));
+    }
+
+    @Test
+    void shouldAddComment() throws Exception {
+        CommentDto comment = new CommentDto(1L, "Отличная вещь", "Автор", null);
+        Mockito.when(itemService.addComment(eq(1L), eq(1L), any())).thenReturn(comment);
+
+        mockMvc.perform(post("/items/1/comment")
+                        .header("X-Sharer-User-Id", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(comment)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.text").value("Отличная вещь"))
+                .andExpect(jsonPath("$.authorName").value("Автор"));
+    }
+
+    @Test
+    void getItemById_notFound_shouldReturn404() throws Exception {
+        Mockito.when(itemService.getItemById(99L, 1L))
+                .thenThrow(new ItemNotFoundException("Item not found"));
+
+        mockMvc.perform(get("/items/99")
+                        .header("X-Sharer-User-Id", 1L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void addComment_withoutBooking_shouldReturn400() throws Exception {
+        CommentDto comment = new CommentDto(null, "Без брони", null, null);
+
+        Mockito.when(itemService.addComment(eq(1L), eq(1L), any()))
+                .thenThrow(new BadRequestException("Нет брони"));
+
+        mockMvc.perform(post("/items/1/comment")
+                        .header("X-Sharer-User-Id", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(comment)))
+                .andExpect(status().isBadRequest());
     }
 }

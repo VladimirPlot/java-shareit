@@ -14,6 +14,7 @@ import ru.practicum.shareit.user.repository.UserRepository;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @Transactional
@@ -66,5 +67,47 @@ class ItemRequestServiceImplTest {
         List<ItemRequestDto> list = requestService.getAllRequests(user.getId(), 0, 10);
 
         assertThat(list).isEmpty();
+    }
+
+    @Test
+    void createRequest_shouldFailForUnknownUser() {
+        ItemRequestCreateDto dto = new ItemRequestCreateDto("Нужен чайник");
+
+        assertThrows(
+                ru.practicum.shareit.exception.UserNotFoundException.class,
+                () -> requestService.createRequest(9999L, dto)
+        );
+    }
+
+    @Test
+    void getOwnRequests_shouldFailForUnknownUser() {
+        assertThrows(
+                ru.practicum.shareit.exception.UserNotFoundException.class,
+                () -> requestService.getOwnRequests(9999L)
+        );
+    }
+
+    @Test
+    void getAllRequests_shouldFailForUnknownUser() {
+        assertThrows(
+                ru.practicum.shareit.exception.UserNotFoundException.class,
+                () -> requestService.getAllRequests(9999L, 0, 10)
+        );
+    }
+
+    @Test
+    void getRequestById_shouldFailForUnknownUser() {
+        assertThrows(
+                ru.practicum.shareit.exception.UserNotFoundException.class,
+                () -> requestService.getRequestById(9999L, 1L)
+        );
+    }
+
+    @Test
+    void getRequestById_shouldFailForUnknownRequest() {
+        assertThrows(
+                ru.practicum.shareit.exception.ItemRequestNotFoundException.class,
+                () -> requestService.getRequestById(user.getId(), 9999L)
+        );
     }
 }

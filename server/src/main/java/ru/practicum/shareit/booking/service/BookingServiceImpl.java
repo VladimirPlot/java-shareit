@@ -9,10 +9,7 @@ import ru.practicum.shareit.booking.mapper.BookingMapper;
 import ru.practicum.shareit.booking.model.Booking;
 import ru.practicum.shareit.booking.model.StatusBooking;
 import ru.practicum.shareit.booking.repository.BookingRepository;
-import ru.practicum.shareit.exception.BadRequestException;
-import ru.practicum.shareit.exception.ItemNotFoundException;
-import ru.practicum.shareit.exception.OwnerNotFoundException;
-import ru.practicum.shareit.exception.UserNotFoundException;
+import ru.practicum.shareit.exception.*;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.repository.ItemRepository;
 import ru.practicum.shareit.user.model.User;
@@ -60,6 +57,10 @@ public class BookingServiceImpl implements BookingService {
             throw new OwnerNotFoundException("Only owner can approve/reject booking");
         }
 
+        if (booking.getStatus() != StatusBooking.WAITING) {
+            throw new BookingAlreadyApprovedException("Booking already processed: " + booking.getStatus());
+        }
+
         booking.setStatus(approved ? StatusBooking.APPROVED : StatusBooking.REJECTED);
         Booking updated = bookingRepository.save(booking);
         return BookingMapper.toResponseDto(updated);
@@ -69,7 +70,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public BookingResponseDto getBookingById(Long userId, Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BadRequestException("Booking not found: " + bookingId));
+                .orElseThrow(() -> new BookingNotFoundException("Booking not found: " + bookingId));
 
         Long ownerId = booking.getItem().getOwner().getId();
         Long bookerId = booking.getBooker().getId();

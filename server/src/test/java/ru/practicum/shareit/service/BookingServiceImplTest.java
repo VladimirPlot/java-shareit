@@ -9,6 +9,9 @@ import ru.practicum.shareit.booking.dto.BookingCreateDto;
 import ru.practicum.shareit.booking.dto.BookingResponseDto;
 import ru.practicum.shareit.booking.model.StatusBooking;
 import ru.practicum.shareit.booking.service.BookingService;
+import ru.practicum.shareit.exception.BadRequestException;
+import ru.practicum.shareit.exception.BookingAlreadyApprovedException;
+import ru.practicum.shareit.exception.OwnerNotFoundException;
 import ru.practicum.shareit.item.model.Item;
 import ru.practicum.shareit.item.repository.ItemRepository;
 import ru.practicum.shareit.user.model.User;
@@ -99,5 +102,184 @@ class BookingServiceImplTest {
         List<BookingResponseDto> list = bookingService.getBookingsByOwner(owner.getId(), "ALL");
 
         assertThat(list).hasSize(1);
+    }
+
+    @Test
+    void createBooking_shouldFailWhenUserBooksOwnItem() {
+        BookingCreateDto dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+
+        assertThatThrownBy(() -> bookingService.createBooking(owner.getId(), dto))
+                .isInstanceOf(OwnerNotFoundException.class);
+    }
+
+    @Test
+    void createBooking_shouldFailWhenItemUnavailable() {
+        item.setAvailable(false);
+        itemRepo.save(item);
+
+        BookingCreateDto dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+
+        assertThatThrownBy(() ->
+                bookingService.createBooking(booker.getId(), dto)
+        ).isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Item is not available");
+    }
+
+    @Test
+    void approveBooking_shouldFailIfAlreadyApproved() {
+        BookingCreateDto dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+        var created = bookingService.createBooking(booker.getId(), dto);
+        bookingService.approveBooking(owner.getId(), created.getId(), true);
+
+        assertThatThrownBy(() ->
+                bookingService.approveBooking(owner.getId(), created.getId(), true)
+        ).isInstanceOf(BookingAlreadyApprovedException.class)
+                .hasMessageContaining("already processed");
+    }
+
+    @Test
+    void getBookingById_shouldFailForOtherUser() {
+        var stranger = userRepo.save(new User(null, "stranger", "s@mail.com"));
+        var dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+        var booking = bookingService.createBooking(booker.getId(), dto);
+
+        assertThatThrownBy(() -> bookingService.getBookingById(stranger.getId(), booking.getId()))
+                .isInstanceOf(OwnerNotFoundException.class);
+    }
+
+    @Test
+    void getBookingsByBooker_withStateWaiting_shouldReturnList() {
+        BookingCreateDto dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusDays(1),
+                LocalDateTime.now().plusDays(2));
+        bookingService.createBooking(booker.getId(), dto);
+
+        var list = bookingService.getBookingsByBooker(booker.getId(), "WAITING");
+        assertThat(list).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByBooker_withStateCurrent_shouldReturnList() {
+        var start = LocalDateTime.now().minusHours(1);
+        var end = LocalDateTime.now().plusHours(1);
+        var dto = new BookingCreateDto(item.getId(), start, end);
+        bookingService.createBooking(booker.getId(), dto);
+
+        var result = bookingService.getBookingsByBooker(booker.getId(), "CURRENT");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByBooker_withStatePast_shouldReturnList() {
+        var start = LocalDateTime.now().minusDays(2);
+        var end = LocalDateTime.now().minusDays(1);
+        var dto = new BookingCreateDto(item.getId(), start, end);
+        var booking = bookingService.createBooking(booker.getId(), dto);
+        bookingService.approveBooking(owner.getId(), booking.getId(), true);
+
+        var result = bookingService.getBookingsByBooker(booker.getId(), "PAST");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByBooker_withStateFuture_shouldReturnList() {
+        var start = LocalDateTime.now().plusDays(1);
+        var end = LocalDateTime.now().plusDays(2);
+        var dto = new BookingCreateDto(item.getId(), start, end);
+        bookingService.createBooking(booker.getId(), dto);
+
+        var result = bookingService.getBookingsByBooker(booker.getId(), "FUTURE");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByBooker_withStateRejected_shouldReturnList() {
+        var dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+        var booking = bookingService.createBooking(booker.getId(), dto);
+        bookingService.approveBooking(owner.getId(), booking.getId(), false);
+
+        var result = bookingService.getBookingsByBooker(booker.getId(), "REJECTED");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByBooker_withStateUnknown_shouldThrow() {
+        assertThatThrownBy(() -> bookingService.getBookingsByBooker(booker.getId(), "UNSUPPORTED"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Unknown state");
+    }
+
+    @Test
+    void getBookingsByOwner_withStateCurrent_shouldReturnList() {
+        var start = LocalDateTime.now().minusHours(1);
+        var end = LocalDateTime.now().plusHours(1);
+        var dto = new BookingCreateDto(item.getId(), start, end);
+        bookingService.createBooking(booker.getId(), dto);
+
+        var result = bookingService.getBookingsByOwner(owner.getId(), "CURRENT");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByOwner_withStatePast_shouldReturnList() {
+        var start = LocalDateTime.now().minusDays(2);
+        var end = LocalDateTime.now().minusDays(1);
+        var dto = new BookingCreateDto(item.getId(), start, end);
+        var booking = bookingService.createBooking(booker.getId(), dto);
+        bookingService.approveBooking(owner.getId(), booking.getId(), true);
+
+        var result = bookingService.getBookingsByOwner(owner.getId(), "PAST");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByOwner_withStateFuture_shouldReturnList() {
+        var start = LocalDateTime.now().plusDays(1);
+        var end = LocalDateTime.now().plusDays(2);
+        var dto = new BookingCreateDto(item.getId(), start, end);
+        bookingService.createBooking(booker.getId(), dto);
+
+        var result = bookingService.getBookingsByOwner(owner.getId(), "FUTURE");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByOwner_withStateWaiting_shouldReturnList() {
+        var dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+        bookingService.createBooking(booker.getId(), dto);
+
+        var result = bookingService.getBookingsByOwner(owner.getId(), "WAITING");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByOwner_withStateRejected_shouldReturnList() {
+        var dto = new BookingCreateDto(item.getId(),
+                LocalDateTime.now().plusHours(1),
+                LocalDateTime.now().plusHours(2));
+        var booking = bookingService.createBooking(booker.getId(), dto);
+        bookingService.approveBooking(owner.getId(), booking.getId(), false);
+
+        var result = bookingService.getBookingsByOwner(owner.getId(), "REJECTED");
+        assertThat(result).hasSize(1);
+    }
+
+    @Test
+    void getBookingsByOwner_withStateUnknown_shouldThrow() {
+        assertThatThrownBy(() -> bookingService.getBookingsByOwner(owner.getId(), "UNSUPPORTED"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Unknown state");
     }
 }

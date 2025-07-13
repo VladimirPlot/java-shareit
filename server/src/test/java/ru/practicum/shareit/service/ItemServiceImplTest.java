@@ -5,6 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.shareit.exception.BadRequestException;
+import ru.practicum.shareit.exception.ItemNotFoundException;
+import ru.practicum.shareit.exception.OwnerNotFoundException;
 import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.service.ItemService;
@@ -160,5 +163,46 @@ class ItemServiceImplTest {
 
         assertThatThrownBy(() -> itemService.addComment(requester.getId(), item.getId(), comment))
                 .isInstanceOf(RuntimeException.class); // Заменить на ожидаемый exception, если знаешь точный
+    }
+
+    @Test
+    void updateItem_shouldFailIfNotOwner() {
+        ItemDto created = itemService.createItem(
+                ItemDto.builder().name("Шуруповёрт").description("desc").available(true).build(),
+                owner.getId());
+
+        ItemDto updates = ItemDto.builder().name("Новая модель").build();
+
+        assertThatThrownBy(() -> itemService.updateItem(updates, created.getId(), requester.getId()))
+                .isInstanceOf(OwnerNotFoundException.class);
+    }
+
+    @Test
+    void getItemById_shouldThrowIfNotFound() {
+        assertThatThrownBy(() -> itemService.getItemById(9999L, owner.getId()))
+                .isInstanceOf(ItemNotFoundException.class);
+    }
+
+    @Test
+    void updateItem_shouldThrowIfItemNotFound() {
+        ItemDto updates = ItemDto.builder().name("Обновление").build();
+
+        assertThatThrownBy(() -> itemService.updateItem(updates, 9999L, owner.getId()))
+                .isInstanceOf(ItemNotFoundException.class);
+    }
+
+    @Test
+    void addComment_shouldFailWithoutPastBooking() {
+        ItemDto item = itemService.createItem(ItemDto.builder()
+                .name("Лампа")
+                .description("Настольная")
+                .available(true)
+                .build(), owner.getId());
+
+        CommentDto comment = new CommentDto();
+        comment.setText("Классная!");
+
+        assertThatThrownBy(() -> itemService.addComment(requester.getId(), item.getId(), comment))
+                .isInstanceOf(BadRequestException.class);
     }
 }

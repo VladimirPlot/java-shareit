@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import ru.practicum.shareit.exception.UserNotFoundException;
 import ru.practicum.shareit.user.controller.UserController;
 import ru.practicum.shareit.user.dto.UserDto;
 import ru.practicum.shareit.user.service.UserService;
@@ -97,5 +98,27 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(1)))
                 .andExpect(jsonPath("$.email", is("john@example.com")));
+    }
+
+    @Test
+    void getUserById_notFound_shouldReturn404() throws Exception {
+        Mockito.when(userService.getUserById(99L))
+                .thenThrow(new UserNotFoundException("User not found"));
+
+        mockMvc.perform(get("/users/99"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateUser_notFound_shouldReturn404() throws Exception {
+        UserDto dto = new UserDto(99L, "Name", "email@example.com");
+
+        Mockito.when(userService.updateUser(any()))
+                .thenThrow(new UserNotFoundException("User not found"));
+
+        mockMvc.perform(patch("/users/99")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isNotFound());
     }
 }

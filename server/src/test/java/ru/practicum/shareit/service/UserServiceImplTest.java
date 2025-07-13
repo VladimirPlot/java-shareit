@@ -95,4 +95,28 @@ class UserServiceImplTest {
 
         assertThat(removed.getId()).isEqualTo(user1.getId());
     }
+
+    @Test
+    void updateUser_notExistingId_shouldThrow() {
+        UserDto update = new UserDto(9999L, "Ghost", "ghost@example.com");
+
+        assertThatThrownBy(() -> userService.updateUser(update))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    void removeUser_notExistingId_shouldThrow() {
+        assertThatThrownBy(() -> userService.removeUserById(9999L))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    void updateUser_withNullFields_shouldKeepOldData() {
+        UserDto update = new UserDto(user1.getId(), null, null);
+
+        UserDto result = userService.updateUser(update);
+
+        assertThat(result.getName()).isEqualTo(user1.getName());
+        assertThat(result.getEmail()).isEqualTo(user1.getEmail());
+    }
 }

@@ -52,6 +52,16 @@ public class GlobalExceptionHandler {
         return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
     }
 
+    @ExceptionHandler
+    public ResponseEntity<ErrorResponse> handleBookingAlreadyApproved(BookingAlreadyApprovedException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler
+    public ResponseEntity<ErrorResponse> handleBookingNotFound(BookingNotFoundException ex) {
+        return buildResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(String message, HttpStatus status) {
         return ResponseEntity.status(status).body(new ErrorResponse(message));
     }
