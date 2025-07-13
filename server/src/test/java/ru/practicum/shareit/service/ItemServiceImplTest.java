@@ -5,16 +5,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
+import ru.practicum.shareit.booking.repository.BookingRepository;
 import ru.practicum.shareit.exception.BadRequestException;
 import ru.practicum.shareit.exception.ItemNotFoundException;
+import ru.practicum.shareit.exception.ItemRequestNotFoundException;
 import ru.practicum.shareit.exception.OwnerNotFoundException;
 import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.repository.CommentRepository;
 import ru.practicum.shareit.item.service.ItemService;
 import ru.practicum.shareit.request.model.ItemRequest;
 import ru.practicum.shareit.request.repository.ItemRequestRepository;
 import ru.practicum.shareit.user.model.User;
 import ru.practicum.shareit.user.repository.UserRepository;
+import ru.practicum.shareit.util.TestUtil;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +37,12 @@ class ItemServiceImplTest {
 
     @Autowired
     private ItemRequestRepository requestRepository;
+
+    @Autowired
+    private BookingRepository bookingRepository;
+
+    @Autowired
+    private CommentRepository commentRepository;
 
     private User owner;
     private User requester;
@@ -204,5 +214,140 @@ class ItemServiceImplTest {
 
         assertThatThrownBy(() -> itemService.addComment(requester.getId(), item.getId(), comment))
                 .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void createItem_withNonExistentRequest_shouldThrow() {
+        ItemDto dto = ItemDto.builder()
+                .name("Стул")
+                .description("Деревянный")
+                .available(true)
+                .requestId(9999L)
+                .build();
+
+        assertThatThrownBy(() -> itemService.createItem(dto, owner.getId()))
+                .isInstanceOf(ItemRequestNotFoundException.class)
+                .hasMessageContaining("Request not found");
+    }
+
+    @Test
+    void searchItems_nullText_shouldReturnEmptyList() {
+        List<ItemDto> result = itemService.searchItems(null);
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getAllItemsByOwner_shouldIncludeBookingsAndComments() {
+        ItemDto itemDto = itemService.createItem(ItemDto.builder()
+                .name("Стол")
+                .description("Обеденный")
+                .available(true)
+                .build(), owner.getId());
+
+        Long itemId = itemDto.getId();
+
+        // прошлое бронирование
+        bookingRepository.save(TestUtil.createBooking(
+                itemId, requester.getId(),
+                LocalDateTime.now().minusDays(3),
+                LocalDateTime.now().minusDays(1)
+        ));
+
+        // будущее бронирование
+        bookingRepository.save(TestUtil.createBooking(
+                itemId, requester.getId(),
+                LocalDateTime.now().plusDays(1),
+                LocalDateTime.now().plusDays(2)
+        ));
+
+        // комментарий
+        commentRepository.save(TestUtil.createComment(itemId, requester));
+
+        List<ItemDto> items = itemService.getAllItemsByOwner(owner.getId());
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).getLastBooking()).isNotNull();
+        assertThat(items.get(0).getNextBooking()).isNotNull();
+        assertThat(items.get(0).getComments()).hasSize(1);
+    }
+
+    @Test
+    void addComment_withPastBooking_shouldSucceed() {
+        ItemDto item = itemService.createItem(ItemDto.builder()
+                .name("Кресло")
+                .description("Мягкое")
+                .available(true)
+                .build(), owner.getId());
+
+        // эмулируем прошедшее бронирование
+        bookingRepository.save(TestUtil.createPastBooking(item.getId(), requester.getId()));
+
+        CommentDto commentDto = new CommentDto();
+        commentDto.setText("Очень удобное!");
+
+        CommentDto result = itemService.addComment(requester.getId(), item.getId(), commentDto);
+
+        assertThat(result.getId()).isNotNull();
+        assertThat(result.getText()).isEqualTo("Очень удобное!");
+        assertThat(result.getAuthorName()).isEqualTo(requester.getName());
+    }
+
+    @Test
+    void getItemById_asOwner_shouldWork_whenNoBookings() {
+        ItemDto item = itemService.createItem(ItemDto.builder()
+                .name("Стул")
+                .description("Деревянный")
+                .available(true)
+                .build(), owner.getId());
+
+        ItemDto result = itemService.getItemById(item.getId(), owner.getId());
+
+        assertThat(result.getLastBooking()).isNull();
+        assertThat(result.getNextBooking()).isNull();
+    }
+
+    @Test
+    void searchItems_shouldReturnEmpty_whenNoMatch() {
+        itemService.createItem(ItemDto.builder()
+                .name("Книга")
+                .description("Про архитектуру")
+                .available(true)
+                .build(), owner.getId());
+
+        List<ItemDto> result = itemService.searchItems("дрель");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void updateItem_shouldUpdateOnlyName() {
+        ItemDto created = itemService.createItem(
+                ItemDto.builder().name("Молоток").description("desc").available(true).build(),
+                owner.getId()
+        );
+
+        ItemDto updates = ItemDto.builder().name("Молоток+").build();
+
+        ItemDto updated = itemService.updateItem(updates, created.getId(), owner.getId());
+
+        assertThat(updated.getName()).isEqualTo("Молоток+");
+        assertThat(updated.getDescription()).isEqualTo("desc");
+        assertThat(updated.getAvailable()).isTrue();
+    }
+
+    @Test
+    void updateItem_shouldUpdateOnlyAvailability() {
+        ItemDto created = itemService.createItem(
+                ItemDto.builder().name("Стул").description("desc").available(true).build(),
+                owner.getId()
+        );
+
+        ItemDto updates = ItemDto.builder().available(false).build();
+
+        ItemDto updated = itemService.updateItem(updates, created.getId(), owner.getId());
+
+        assertThat(updated.getAvailable()).isFalse();
+        assertThat(updated.getName()).isEqualTo("Стул");
+        assertThat(updated.getDescription()).isEqualTo("desc");
     }
 }
