@@ -49,7 +49,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponseDto approveBooking(Long ownerId, Long bookingId, boolean approved) {
+    public BookingResponseDto approveBooking(Long ownerId, Long bookingId, Boolean approved) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BadRequestException("Booking not found: " + bookingId));
 

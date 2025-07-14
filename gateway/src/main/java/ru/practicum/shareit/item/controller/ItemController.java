@@ -15,26 +15,26 @@ public class ItemController {
     private final ItemClient itemClient;
 
     @PostMapping
-    public ResponseEntity<Object> createItem(@RequestHeader("X-Sharer-User-Id") long ownerId,
+    public ResponseEntity<Object> createItem(@RequestHeader("X-Sharer-User-Id") Long ownerId,
                                              @RequestBody @Valid ItemDto itemDto) {
         return itemClient.createItem(ownerId, itemDto);
     }
 
     @PatchMapping("/{itemId}")
-    public ResponseEntity<Object> updateItem(@RequestHeader("X-Sharer-User-Id") long ownerId,
-                                             @PathVariable long itemId,
+    public ResponseEntity<Object> updateItem(@RequestHeader("X-Sharer-User-Id") Long ownerId,
+                                             @PathVariable Long itemId,
                                              @RequestBody ItemDto itemDto) {
         return itemClient.updateItem(ownerId, itemId, itemDto);
     }
 
     @GetMapping("/{itemId}")
-    public ResponseEntity<Object> getItemById(@RequestHeader("X-Sharer-User-Id") long userId,
-                                              @PathVariable long itemId) {
+    public ResponseEntity<Object> getItemById(@RequestHeader("X-Sharer-User-Id") Long userId,
+                                              @PathVariable Long itemId) {
         return itemClient.getItemById(userId, itemId);
     }
 
     @GetMapping
-    public ResponseEntity<Object> getAllItemsByOwner(@RequestHeader("X-Sharer-User-Id") long ownerId) {
+    public ResponseEntity<Object> getAllItemsByOwner(@RequestHeader("X-Sharer-User-Id") Long ownerId) {
         return itemClient.getAllItemsByOwner(ownerId);
     }
 
@@ -44,8 +44,8 @@ public class ItemController {
     }
 
     @PostMapping("/{itemId}/comment")
-    public ResponseEntity<Object> addComment(@RequestHeader("X-Sharer-User-Id") long userId,
-                                             @PathVariable long itemId,
+    public ResponseEntity<Object> addComment(@RequestHeader("X-Sharer-User-Id") Long userId,
+                                             @PathVariable Long itemId,
                                              @RequestBody @Valid CommentDto commentDto) {
         return itemClient.addComment(userId, itemId, commentDto);
     }

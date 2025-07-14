@@ -56,7 +56,7 @@ public class ItemRequestServiceImpl implements ItemRequestService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ItemRequestDto> getAllRequests(Long userId, int from, int size) {
+    public List<ItemRequestDto> getAllRequests(Long userId, Integer from, Integer size) {
         userRepo.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + userId));
         var page = PageRequest.of(from / size, size);
